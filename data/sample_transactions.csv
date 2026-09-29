@@ -1,0 +1,43 @@
+txn_date,amount,type,category,description,customer_vendor,account
+2026-01-05,450000,income,sales,Weekly sales - week 1,Walk-in customers,GTBank Current
+2026-01-07,85000,expense,inventory,Stock restock,Lagos Wholesale Ltd,GTBank Current
+2026-01-10,12000,expense,transportation,Fuel for delivery van,Total Filling Station,Cash
+2026-01-15,520000,income,sales,Weekly sales - week 2,Walk-in customers,GTBank Current
+2026-01-18,45000,expense,utilities,Electricity bill,EKEDC,GTBank Current
+2026-01-20,150000,expense,salaries,Staff wages - mid month,Staff,GTBank Current
+2026-02-02,610000,income,sales,Weekly sales - week 1,Walk-in customers,GTBank Current
+2026-02-05,95000,expense,inventory,Stock restock,Lagos Wholesale Ltd,GTBank Current
+2026-02-09,18000,expense,transportation,Fuel for delivery van,Total Filling Station,Cash
+2026-02-14,480000,income,sales,Weekly sales - week 2,Walk-in customers,GTBank Current
+2026-03-02,90000,expense,rent,Monthly rent,Property Manager,GTBank Current
+2026-03-05,560000,income,sales,Weekly sales - week 1,Walk-in customers,GTBank Current
+2026-03-07,90000,expense,inventory,Stock restock,Lagos Wholesale Ltd,GTBank Current
+2026-03-10,15000,expense,transportation,Fuel for delivery van,Total Filling Station,Cash
+2026-03-12,30000,expense,marketing,Instagram ads,Meta Ads,GTBank Current
+2026-03-15,500000,income,sales,Weekly sales - week 2,Walk-in customers,GTBank Current
+2026-03-18,42000,expense,utilities,Electricity bill,EKEDC,GTBank Current
+2026-03-20,150000,expense,salaries,Staff wages,Staff,GTBank Current
+2026-04-02,90000,expense,rent,Monthly rent,Property Manager,GTBank Current
+2026-04-05,400000,income,sales,Weekly sales - week 1,Walk-in customers,GTBank Current
+2026-04-07,88000,expense,inventory,Stock restock,Lagos Wholesale Ltd,GTBank Current
+2026-04-10,17000,expense,transportation,Fuel for delivery van,Total Filling Station,Cash
+2026-04-12,35000,expense,marketing,Instagram ads,Meta Ads,GTBank Current
+2026-04-15,380000,income,sales,Weekly sales - week 2,Walk-in customers,GTBank Current
+2026-04-18,48000,expense,utilities,Electricity bill,EKEDC,GTBank Current
+2026-04-20,150000,expense,salaries,Staff wages,Staff,GTBank Current
+2026-05-02,90000,expense,rent,Monthly rent,Property Manager,GTBank Current
+2026-05-05,590000,income,sales,Weekly sales - week 1,Walk-in customers,GTBank Current
+2026-05-07,100000,expense,inventory,Stock restock,Lagos Wholesale Ltd,GTBank Current
+2026-05-10,14000,expense,transportation,Fuel for delivery van,Total Filling Station,Cash
+2026-05-12,20000,expense,marketing,Instagram ads,Meta Ads,GTBank Current
+2026-05-15,610000,income,sales,Weekly sales - week 2,Walk-in customers,GTBank Current
+2026-05-18,39000,expense,utilities,Electricity bill,EKEDC,GTBank Current
+2026-05-20,155000,expense,salaries,Staff wages,Staff,GTBank Current
+2026-06-02,90000,expense,rent,Monthly rent,Property Manager,GTBank Current
+2026-06-05,300000,income,sales,Weekly sales - week 1,Walk-in customers,GTBank Current
+2026-06-07,220000,expense,inventory,Large stock restock,Lagos Wholesale Ltd,GTBank Current
+2026-06-10,22000,expense,transportation,Fuel for delivery van,Total Filling Station,Cash
+2026-06-12,50000,expense,marketing,Instagram ads,Meta Ads,GTBank Current
+2026-06-15,280000,income,sales,Weekly sales - week 2,Walk-in customers,GTBank Current
+2026-06-18,58000,expense,utilities,Electricity bill,EKEDC,GTBank Current
+2026-06-20,160000,expense,salaries,Staff wages,Staff,GTBank Current

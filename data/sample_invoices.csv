@@ -1,0 +1,9 @@
+customer,amount,due_date,payment_date,status,upload_id
+Customer A,850000,2026-04-30,,overdue,1
+Customer B,420000,2026-06-14,,overdue,1
+Customer C,90000,2026-06-28,,outstanding,1
+Customer D,300000,2026-05-20,2026-05-18,paid,1
+Customer E,610000,2026-03-28,,overdue,1
+Customer B,150000,2026-06-22,,outstanding,1
+Customer A,275000,2026-05-05,2026-05-10,paid,1
+Customer C,530000,2026-05-22,,overdue,1

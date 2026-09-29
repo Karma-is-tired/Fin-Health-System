@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+database/finance_tool.db
+frontend/node_modules/
+frontend/dist/
+.env
