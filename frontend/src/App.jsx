@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://fin-health-system.onrender.com";
 const API_KEY = "dev-secret-key-change-later";
 
 function App() {
