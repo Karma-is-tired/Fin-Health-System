@@ -1,18 +1,23 @@
  
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 import pandas as pd
- 
+
 app = FastAPI()
- 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://fin-health-system.vercel.app"],
+    allow_origins=[
+        "https://fin-health-system.vercel.app",
+        "http://localhost:5173" # Keeps your local development working
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
- 
+
+# ... rest of your code ...
 # A simple shared-secret check -- every request to a protected endpoint
 # must include this exact value in an X-API-Key header, or it's rejected.
 # This is a development-level protection, not production-grade security
