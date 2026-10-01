@@ -1,87 +1,51 @@
-import { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { LayoutDashboard, Upload, LogOut } from 'lucide-react';
+import Dashboard from './Dashboard';
+import UploadScreen from './UploadScreen';
+import Login from './Login';
 
-const API_BASE = "https://fin-health-system.onrender.com";
-const API_KEY = "dev-secret-key-change-later";
-
-function App() {
-  const [healthScore, setHealthScore] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    fetch(`${API_BASE}/health-score`, { headers: { "X-API-Key": API_KEY } })
-      .then((res) => res.json())
-      .then(setHealthScore)
-      .catch(() => setError("Could not reach the API. Is main.py running?"));
-
-    fetch(`${API_BASE}/financial-summary`, { headers: { "X-API-Key": API_KEY } })
-      .then((res) => res.json())
-      .then(setSummary)
-      .catch(() => setError("Could not reach the API. Is main.py running?"));
-  }, []);
-
-  if (error) {
-    return <div style={{ padding: 40, fontFamily: "sans-serif", color: "#A23B2E" }}>{error}</div>;
-  }
-
-  if (!healthScore || !summary) {
-    return <div style={{ padding: 40, fontFamily: "sans-serif" }}>Loading...</div>;
-  }
-
-  const cardStyle = {
-    border: "1px solid #DCDED4",
-    borderRadius: 6,
-    padding: 16,
-    flex: 1,
-  };
-  
-  const labelStyle = { 
-    fontSize: 12,
-    color: "#5D7A6B",
-    textTransform: "uppercase"
-  };
-  
-  const numberStyle = { 
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#12201C"
-  };
-
+function SidebarLayout({ children }) {
   return (
-    <div style={{ fontFamily: "sans-serif", padding: 40, maxWidth: 900, margin: "0 auto" }}>
-      <h1>Financial Health & Cash-Flow System</h1>
-      <p style={{ color: "#5D7A6B" }}>Latest period: {summary.latest_month}</p>
+    <div className="flex h-screen bg-darkBg text-slate-300 font-sans">
+      {/* Sidebar */}
+      <aside className="w-64 bg-[#111827] border-r border-slate-800 flex flex-col">
+        <div className="p-6">
+          <h2 className="text-xl font-bold text-white tracking-wider">FIN<span className="text-accentYellow">HEALTH</span></h2>
+        </div>
+        <nav className="flex-1 px-4 space-y-2 mt-4">
+          <Link to="/dashboard" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 hover:text-accentYellow transition-colors">
+            <LayoutDashboard size={20} />
+            <span>Dashboard</span>
+          </Link>
+          <Link to="/upload" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 hover:text-accentYellow transition-colors">
+            <Upload size={20} />
+            <span>Upload Data</span>
+          </Link>
+        </nav>
+        <div className="p-4 border-t border-slate-800">
+          <Link to="/" className="flex items-center gap-3 p-3 rounded-lg text-red-400 hover:bg-slate-800 transition-colors">
+            <LogOut size={20} />
+            <span>Sign out</span>
+          </Link>
+        </div>
+      </aside>
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
-        <div style={{ ...cardStyle, flex: "0 0 160px", textAlign: "center" }}>
-          <div style={{ fontSize: 36, fontWeight: "bold" }}>{healthScore.overall}</div>
-          <div style={labelStyle}>/ 100 Health Score</div>
-        </div>
-        
-        <div style={cardStyle}>
-          <div style={labelStyle}>Revenue</div>
-          <div style={numberStyle}>{summary.revenue.toLocaleString()}</div>
-        </div>
-        
-        <div style={cardStyle}>
-          <div style={labelStyle}>Net Profit</div>
-          <div style={numberStyle}>{summary.net_profit.toLocaleString()}</div>
-        </div>
-        
-        <div style={cardStyle}>
-          <div style={labelStyle}>Overdue A/R</div>
-          <div style={{ ...numberStyle, color: "#A23B2E" }}>{summary.overdue_receivables.toLocaleString()}</div>
-        </div>
-      </div>
-
-      <h3>Score breakdown</h3>
-      <ul>
-        {Object.entries(healthScore.scores).map(([factor, score]) => (
-          <li key={factor}>{factor}: {score} / 100</li>
-        ))}
-      </ul>
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-8">
+        {children}
+      </main>
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={<SidebarLayout><Dashboard /></SidebarLayout>} />
+        <Route path="/upload" element={<SidebarLayout><UploadScreen /></SidebarLayout>} />
+      </Routes>
+    </Router>
+  );
+}
