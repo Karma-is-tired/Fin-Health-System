@@ -6,3 +6,5 @@ scikit-learn
 statsmodels
 pytest
 httpx
+python-multipart
+openpyxl
