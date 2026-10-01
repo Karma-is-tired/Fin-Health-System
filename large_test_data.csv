@@ -1,0 +1,101 @@
+txn_date,amount,type,category,description,customer_vendor,account
+2026-07-03,719085.35,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-03,715529.85,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-05,108693.88,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-07-06,265586.67,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-06,162249.01,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-07-08,141951.98,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-07-09,201761.47,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-07-09,21114.85,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-07-09,14088.41,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-07-10,793246.06,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-12,230415.31,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-13,23152.01,expense,utilities,Standard utilities expense,EKEDC,GTBank Current
+2026-07-14,188545.17,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-07-15,59164.88,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-07-15,221063.54,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-07-15,45427.38,expense,utilities,Standard utilities expense,EKEDC,GTBank Current
+2026-07-16,448689.49,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-18,855658.21,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-20,644484.8,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-22,14245.2,expense,transportation,Standard transportation expense,Total Filling Station,GTBank Current
+2026-07-23,121961.52,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-07-24,95809.61,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-07-24,30709.64,expense,utilities,Standard utilities expense,EKEDC,GTBank Current
+2026-07-24,187636.76,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-07-25,549461.88,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-07-27,15585.21,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-07-29,39880.55,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-07-30,34479.86,expense,utilities,Standard utilities expense,EKEDC,GTBank Current
+2026-07-30,201156.43,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-07-30,311987.4,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-01,126953.46,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-08-03,125141.41,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-08-05,186056.68,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-08-05,175087.78,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-08-07,27390.61,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-08-08,705464.44,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-10,550410.28,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-10,224103.71,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-08-11,160897.02,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-08-11,15787.58,expense,transportation,Standard transportation expense,Total Filling Station,GTBank Current
+2026-08-13,132415.61,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-08-13,454086.54,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-14,368610.11,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-16,196381.52,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-08-16,176583.44,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-08-16,116512.7,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-08-18,58574.52,expense,utilities,Standard utilities expense,EKEDC,GTBank Current
+2026-08-20,19258.98,expense,transportation,Standard transportation expense,Total Filling Station,GTBank Current
+2026-08-21,27524.0,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-08-23,9493.95,expense,transportation,Standard transportation expense,Total Filling Station,GTBank Current
+2026-08-24,587745.07,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-26,249695.16,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-28,247180.23,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-08-28,152831.22,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-08-29,15784.68,expense,transportation,Standard transportation expense,Total Filling Station,GTBank Current
+2026-08-31,157621.16,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-08-31,27616.4,expense,utilities,Standard utilities expense,EKEDC,GTBank Current
+2026-08-31,26943.14,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-09-01,184672.91,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-09-03,481834.9,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-04,99731.27,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-09-04,13437.63,expense,transportation,Standard transportation expense,Total Filling Station,GTBank Current
+2026-09-05,138626.15,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-09-07,656501.43,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-09,235273.4,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-09-09,539948.79,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-09,82927.42,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-09-09,47060.72,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-09-10,687614.05,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-12,166187.13,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-09-13,407695.48,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-13,106095.76,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-09-14,608924.32,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-16,115743.27,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-09-18,330077.47,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-20,803273.44,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-21,823201.12,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-21,173876.3,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-09-22,152278.27,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-09-23,701334.26,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-23,291614.8,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-25,421324.04,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-25,634811.48,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-27,157526.88,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
+2026-09-29,853281.56,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-09-29,21399.5,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-09-30,34467.11,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-10-02,129937.88,expense,salaries,Standard salaries expense,Staff,GTBank Current
+2026-10-04,814688.88,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-10-05,274925.18,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-10-07,397229.39,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-10-07,18749.94,expense,transportation,Standard transportation expense,Total Filling Station,GTBank Current
+2026-10-08,46213.46,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-10-08,496503.04,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-10-09,433489.58,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-10-09,16463.28,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-10-10,42436.27,expense,utilities,Standard utilities expense,EKEDC,GTBank Current
+2026-10-10,818174.48,income,sales,Weekly sales revenue,Walk-in customers,GTBank Current
+2026-10-10,33300.38,expense,marketing,Standard marketing expense,Meta Ads,GTBank Current
+2026-10-10,111651.67,expense,inventory,Standard inventory expense,Lagos Wholesale Ltd,GTBank Current
