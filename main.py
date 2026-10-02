@@ -15,6 +15,7 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
+import hashlib # <--- The new library that permanently fixes the 72-byte limit
 
 # ==========================================
 # 0. SERVER INITIALIZATION & FOLDER SAFETY
@@ -107,8 +108,10 @@ def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        # FIX: Truncate password to exactly 72 bytes so bcrypt never crashes
-        hashed_password = pwd_context.hash(user.password[:72])
+        # FIX: Pre-hash the password to a perfect 64-character string to bypass bcrypt's limit entirely
+        safe_password = hashlib.sha256(user.password.encode('utf-8')).hexdigest()
+        hashed_password = pwd_context.hash(safe_password)
+        
         otp = str(random.randint(100000, 999999))
         
         db.execute(
@@ -142,8 +145,10 @@ def verify_otp(data: OTPVerify, db: sqlite3.Connection = Depends(get_db)):
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
     user = db.execute("SELECT * FROM users WHERE email = ?", (form_data.username,)).fetchone()
     
-    # FIX: Ensure we truncate the login attempt to match the saved 72-byte rule
-    if not user or not pwd_context.verify(form_data.password[:72], user["password_hash"]):
+    # FIX: Pre-hash the login attempt so it matches the safe password format we stored
+    safe_password = hashlib.sha256(form_data.password.encode('utf-8')).hexdigest()
+    
+    if not user or not pwd_context.verify(safe_password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
         
     if not user["is_verified"]:
