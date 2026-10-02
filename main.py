@@ -19,7 +19,6 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. SERVER INITIALIZATION & FOLDER SAFETY
 # ==========================================
-# This completely prevents the CORS crash by ensuring the folder always exists!
 os.makedirs("database", exist_ok=True)
 
 app = FastAPI()
@@ -36,8 +35,6 @@ app.add_middleware(
 # IRONCLAD GLOBAL CRASH HANDLER
 @app.exception_handler(Exception)
 async def global_crash_handler(request: Request, exc: Exception):
-    # If the server ever crashes outside of our route logic, this intercepts it 
-    # and forces the CORS headers to remain intact so your frontend can read the error!
     return JSONResponse(
         status_code=500,
         content={"detail": f"CRITICAL BACKEND CRASH: {str(exc)}"},
@@ -110,7 +107,8 @@ def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        hashed_password = pwd_context.hash(user.password)
+        # FIX: Truncate password to exactly 72 bytes so bcrypt never crashes
+        hashed_password = pwd_context.hash(user.password[:72])
         otp = str(random.randint(100000, 999999))
         
         db.execute(
@@ -143,8 +141,11 @@ def verify_otp(data: OTPVerify, db: sqlite3.Connection = Depends(get_db)):
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
     user = db.execute("SELECT * FROM users WHERE email = ?", (form_data.username,)).fetchone()
-    if not user or not pwd_context.verify(form_data.password, user["password_hash"]):
+    
+    # FIX: Ensure we truncate the login attempt to match the saved 72-byte rule
+    if not user or not pwd_context.verify(form_data.password[:72], user["password_hash"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
+        
     if not user["is_verified"]:
         raise HTTPException(status_code=403, detail="Please verify your email via OTP first")
     
@@ -342,8 +343,6 @@ def download_past_report(report_id: int, current_user: dict = Depends(get_curren
 @app.get("/run-db-upgrade")
 def run_db_upgrade():
     import upgrade_db
-    # Force folder creation here as well just in case!
     os.makedirs("database", exist_ok=True) 
     upgrade_db.upgrade_database()
     return {"message": "Success: Render database has been upgraded!"}
-    
