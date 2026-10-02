@@ -9,3 +9,5 @@ httpx
 python-multipart
 openpyxl
 python-docx
+passlib
+PyJWT

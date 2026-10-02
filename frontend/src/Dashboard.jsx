@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, DollarSign, AlertCircle, DownloadCloud } from 'lucide-react';
 
-const API_BASE = "https://fin-health-system.onrender.com"; // Ensure this is your live URL
-const API_KEY = "dev-secret-key-change-later";
+const API_BASE = "https://fin-health-system.onrender.com"; 
 
 export default function Dashboard() {
   const [healthScore, setHealthScore] = useState(null);
@@ -10,11 +9,17 @@ export default function Dashboard() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/health-score`, { headers: { "X-API-Key": API_KEY } })
+    const token = localStorage.getItem('token');
+
+    fetch(`${API_BASE}/health-score`, { 
+      headers: { "Authorization": `Bearer ${token}` } 
+    })
       .then(res => res.json())
       .then(setHealthScore);
 
-    fetch(`${API_BASE}/financial-summary`, { headers: { "X-API-Key": API_KEY } })
+    fetch(`${API_BASE}/financial-summary`, { 
+      headers: { "Authorization": `Bearer ${token}` } 
+    })
       .then(res => res.json())
       .then(setSummary);
   }, []);
@@ -22,13 +27,13 @@ export default function Dashboard() {
   const handleDownloadReport = async () => {
     setIsDownloading(true);
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/download-report`, {
-        headers: { "X-API-Key": API_KEY }
+        headers: { "Authorization": `Bearer ${token}` }
       });
       
       if (!response.ok) throw new Error("Download failed");
       
-      // Magic trick to download a file securely through React
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

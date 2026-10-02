@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { UploadCloud } from 'lucide-react';
 
-const API_BASE = "https://fin-health-system.onrender.com"; // Change to your live URL or localhost
-const API_KEY = "dev-secret-key-change-later";
+const API_BASE = "https://fin-health-system.onrender.com"; 
 
 export default function UploadScreen() {
   const [file, setFile] = useState(null);
@@ -17,9 +16,10 @@ export default function UploadScreen() {
     formData.append('file', file);
 
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/upload-transactions`, {
         method: 'POST',
-        headers: { "X-API-Key": API_KEY },
+        headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
       
