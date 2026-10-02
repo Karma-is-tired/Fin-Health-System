@@ -318,3 +318,11 @@ def download_past_report(report_id: int, current_user: dict = Depends(get_curren
     
     path = generate_docx(report["report_month"], report["overall_score"], report["revenue"], report["net_profit"])
     return FileResponse(path, filename=f"FinHealth_Archive_{report['report_month']}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    # ==========================================
+# TEMPORARY RENDER DB UPGRADE HACK
+# ==========================================
+@app.get("/run-db-upgrade")
+def run_db_upgrade():
+    import upgrade_db
+    upgrade_db.upgrade_database()
+    return {"message": "Success: Render database has been upgraded!"}
