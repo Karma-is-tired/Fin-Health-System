@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, status
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -16,6 +16,12 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 
+# ==========================================
+# 0. SERVER INITIALIZATION & FOLDER SAFETY
+# ==========================================
+# This completely prevents the CORS crash by ensuring the folder always exists!
+os.makedirs("database", exist_ok=True)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -27,12 +33,23 @@ app.add_middleware(
     expose_headers=["Content-Disposition"]
 )
 
+# IRONCLAD GLOBAL CRASH HANDLER
+@app.exception_handler(Exception)
+async def global_crash_handler(request: Request, exc: Exception):
+    # If the server ever crashes outside of our route logic, this intercepts it 
+    # and forces the CORS headers to remain intact so your frontend can read the error!
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"CRITICAL BACKEND CRASH: {str(exc)}"},
+        headers={"Access-Control-Allow-Origin": "*"}
+    )
+
 # ==========================================
 # 1. SECURITY & AUTH SETUP
 # ==========================================
-SECRET_KEY = "your-super-secret-production-key" # Change this in production
+SECRET_KEY = "your-super-secret-production-key" 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440 # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -77,11 +94,9 @@ def send_otp_email(email: str, otp: str):
     msg['To'] = email
 
     try:
-        # Connect to Gmail's live SMTP server
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_email, sender_password)
             server.send_message(msg)
-            print(f"Success: OTP sent to {email}")
     except Exception as e:
         print(f"Critical Email Error: {e}")
 
@@ -109,10 +124,8 @@ def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
         return {"message": "User created. Please check your email for the OTP."}
     
     except sqlite3.OperationalError as e:
-        # Catches missing tables if the Render server wiped the database
         raise HTTPException(status_code=500, detail=f"Database Crash: {str(e)}. Did you run /run-db-upgrade?")
     except Exception as e:
-        # Catches missing packages, password hashing failures, or email server crashes
         raise HTTPException(status_code=500, detail=f"System Crash: {str(e)}")
 
 @app.post("/verify-otp")
@@ -300,7 +313,6 @@ def download_report(current_user: dict = Depends(get_current_user), db: sqlite3.
     scores = health_score(current_user, db)
     summary = financial_summary(current_user, db)
     
-    # Save to history when downloaded
     db.execute(
         "INSERT INTO report_history (user_id, report_month, overall_score, revenue, net_profit) VALUES (?, ?, ?, ?, ?)",
         (current_user["id"], summary["latest_month"], scores["overall"], summary["revenue"], summary["net_profit"])
@@ -330,5 +342,8 @@ def download_past_report(report_id: int, current_user: dict = Depends(get_curren
 @app.get("/run-db-upgrade")
 def run_db_upgrade():
     import upgrade_db
+    # Force folder creation here as well just in case!
+    os.makedirs("database", exist_ok=True) 
     upgrade_db.upgrade_database()
     return {"message": "Success: Render database has been upgraded!"}
+    
