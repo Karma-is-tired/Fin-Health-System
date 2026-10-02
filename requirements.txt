@@ -9,5 +9,5 @@ httpx
 python-multipart
 openpyxl
 python-docx
-passlib
+passlib[bcrypt]
 PyJWT

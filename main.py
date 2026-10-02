@@ -68,26 +68,23 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: sqlite3.Connection
     return user
 
 def send_otp_email(email: str, otp: str):
-    """Sends OTP via email. Prints to console as a fallback for testing."""
-    print(f"\n{'='*40}\nDEV MODE - OTP FOR {email}: {otp}\n{'='*40}\n")
+    # !!! IMPORTANT: PUT YOUR REAL DETAILS HERE BEFORE PUSHING !!!
+    sender_email = "karmaxzodiac@gmail.com" 
+    sender_password = "cmsjyivcncslmhmj" # No spaces needed
     
-    sender_email = "YOUR_EMAIL@gmail.com" # REPLACE THIS
-    sender_password = "YOUR_APP_PASSWORD" # REPLACE THIS
-    
-    if sender_email == "YOUR_EMAIL@gmail.com":
-        return # Skip actual email send if not configured yet
-        
-    msg = MIMEText(f"Welcome to FinHealth! Your account verification code is: {otp}")
+    msg = MIMEText(f"Welcome to FinHealth! Your secure account verification code is: {otp}\n\nPlease enter this on the website to activate your account.")
     msg['Subject'] = 'Confirm your FinHealth Account'
-    msg['From'] = sender_email
+    msg['From'] = f"FinHealth Security <{sender_email}>"
     msg['To'] = email
 
     try:
+        # Connect to Gmail's live SMTP server
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_email, sender_password)
             server.send_message(msg)
+            print(f"Success: OTP sent to {email}")
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        print(f"Critical Email Error: {e}")
 
 # ==========================================
 # 2. AUTHENTICATION ENDPOINTS
@@ -318,7 +315,8 @@ def download_past_report(report_id: int, current_user: dict = Depends(get_curren
     
     path = generate_docx(report["report_month"], report["overall_score"], report["revenue"], report["net_profit"])
     return FileResponse(path, filename=f"FinHealth_Archive_{report['report_month']}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    # ==========================================
+
+# ==========================================
 # TEMPORARY RENDER DB UPGRADE HACK
 # ==========================================
 @app.get("/run-db-upgrade")
