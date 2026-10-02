@@ -68,9 +68,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: sqlite3.Connection
     return user
 
 def send_otp_email(email: str, otp: str):
-    # !!! IMPORTANT: PUT YOUR REAL DETAILS HERE BEFORE PUSHING !!!
     sender_email = "karmaxzodiac@gmail.com" 
-    sender_password = "cmsjyivcncslmhmj" # No spaces needed
+    sender_password = "cmsjyivcncslmhmj" 
     
     msg = MIMEText(f"Welcome to FinHealth! Your secure account verification code is: {otp}\n\nPlease enter this on the website to activate your account.")
     msg['Subject'] = 'Confirm your FinHealth Account'
@@ -91,21 +90,30 @@ def send_otp_email(email: str, otp: str):
 # ==========================================
 @app.post("/signup")
 def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
-    existing = db.execute("SELECT * FROM users WHERE email = ?", (user.email,)).fetchone()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    try:
+        existing = db.execute("SELECT * FROM users WHERE email = ?", (user.email,)).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        hashed_password = pwd_context.hash(user.password)
+        otp = str(random.randint(100000, 999999))
+        
+        db.execute(
+            "INSERT INTO users (email, password_hash, otp_code) VALUES (?, ?, ?)",
+            (user.email, hashed_password, otp)
+        )
+        db.commit()
+        
+        send_otp_email(user.email, otp)
+        
+        return {"message": "User created. Please check your email for the OTP."}
     
-    hashed_password = pwd_context.hash(user.password)
-    otp = str(random.randint(100000, 999999))
-    
-    db.execute(
-        "INSERT INTO users (email, password_hash, otp_code) VALUES (?, ?, ?)",
-        (user.email, hashed_password, otp)
-    )
-    db.commit()
-    send_otp_email(user.email, otp)
-    
-    return {"message": "User created. Please check your email for the OTP."}
+    except sqlite3.OperationalError as e:
+        # Catches missing tables if the Render server wiped the database
+        raise HTTPException(status_code=500, detail=f"Database Crash: {str(e)}. Did you run /run-db-upgrade?")
+    except Exception as e:
+        # Catches missing packages, password hashing failures, or email server crashes
+        raise HTTPException(status_code=500, detail=f"System Crash: {str(e)}")
 
 @app.post("/verify-otp")
 def verify_otp(data: OTPVerify, db: sqlite3.Connection = Depends(get_db)):
