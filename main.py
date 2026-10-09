@@ -3,7 +3,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from passlib.context import CryptContext
 from docx import Document
 import jwt
 import sqlite3
@@ -11,6 +10,7 @@ import pandas as pd
 import io
 import tempfile
 import os
+import hashlib
 from datetime import datetime, timedelta
 
 # ==========================================
@@ -44,7 +44,6 @@ SECRET_KEY = "your-super-secret-production-key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 class UserCreate(BaseModel):
@@ -73,8 +72,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: sqlite3.Connection
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
+def hash_password(password: str) -> str:
+    # Bulletproof hashing that never crashes regardless of length or characters
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
 # ==========================================
-# 2. AUTHENTICATION ENDPOINTS (NO OTP)
+# 2. AUTHENTICATION ENDPOINTS (NO OTP, NO BCRYPT)
 # ==========================================
 @app.post("/signup")
 def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
@@ -83,13 +86,12 @@ def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        # Enforce 72-byte limit safely
-        hashed_password = pwd_context.hash(user.password[:72])
+        secure_hash = hash_password(user.password)
         
-        # Insert user and instantly mark as verified (is_verified = 1)
+        # Instantly mark user as verified
         db.execute(
             "INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, 1)",
-            (user.email, hashed_password)
+            (user.email, secure_hash)
         )
         db.commit()
         
@@ -104,7 +106,7 @@ def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
     user = db.execute("SELECT * FROM users WHERE email = ?", (form_data.username,)).fetchone()
     
-    if not user or not pwd_context.verify(form_data.password[:72], user["password_hash"]):
+    if not user or hash_password(form_data.password) != user["password_hash"]:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     
     access_token = jwt.encode(
