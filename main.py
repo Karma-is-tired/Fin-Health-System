@@ -15,7 +15,7 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
-import hashlib # <--- The new library that permanently fixes the 72-byte limit
+import hashlib 
 
 # ==========================================
 # 0. SERVER INITIALIZATION & FOLDER SAFETY
@@ -33,7 +33,6 @@ app.add_middleware(
     expose_headers=["Content-Disposition"]
 )
 
-# IRONCLAD GLOBAL CRASH HANDLER
 @app.exception_handler(Exception)
 async def global_crash_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -108,7 +107,6 @@ def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        # FIX: Pre-hash the password to a perfect 64-character string to bypass bcrypt's limit entirely
         safe_password = hashlib.sha256(user.password.encode('utf-8')).hexdigest()
         hashed_password = pwd_context.hash(safe_password)
         
@@ -145,7 +143,6 @@ def verify_otp(data: OTPVerify, db: sqlite3.Connection = Depends(get_db)):
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
     user = db.execute("SELECT * FROM users WHERE email = ?", (form_data.username,)).fetchone()
     
-    # FIX: Pre-hash the login attempt so it matches the safe password format we stored
     safe_password = hashlib.sha256(form_data.password.encode('utf-8')).hexdigest()
     
     if not user or not pwd_context.verify(safe_password, user["password_hash"]):
@@ -342,9 +339,6 @@ def download_past_report(report_id: int, current_user: dict = Depends(get_curren
     path = generate_docx(report["report_month"], report["overall_score"], report["revenue"], report["net_profit"])
     return FileResponse(path, filename=f"FinHealth_Archive_{report['report_month']}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-# ==========================================
-# TEMPORARY RENDER DB UPGRADE HACK
-# ==========================================
 @app.get("/run-db-upgrade")
 def run_db_upgrade():
     import upgrade_db
