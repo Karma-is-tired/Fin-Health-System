@@ -11,11 +11,7 @@ import pandas as pd
 import io
 import tempfile
 import os
-import random
-import smtplib
-from email.mime.text import MIMEText
 from datetime import datetime, timedelta
-import hashlib 
 
 # ==========================================
 # 0. SERVER INITIALIZATION & FOLDER SAFETY
@@ -55,10 +51,6 @@ class UserCreate(BaseModel):
     email: str
     password: str
 
-class OTPVerify(BaseModel):
-    email: str
-    otp: str
-
 def get_db():
     conn = sqlite3.connect("database/finance_tool.db")
     conn.row_factory = sqlite3.Row
@@ -81,24 +73,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: sqlite3.Connection
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
-def send_otp_email(email: str, otp: str):
-    sender_email = "karmaxzodiac@gmail.com" 
-    sender_password = "cmsjyivcncslmhmj" 
-    
-    msg = MIMEText(f"Welcome to FinHealth! Your secure account verification code is: {otp}\n\nPlease enter this on the website to activate your account.")
-    msg['Subject'] = 'Confirm your FinHealth Account'
-    msg['From'] = f"FinHealth Security <{sender_email}>"
-    msg['To'] = email
-
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-    except Exception as e:
-        print(f"Critical Email Error: {e}")
-
 # ==========================================
-# 2. AUTHENTICATION ENDPOINTS
+# 2. AUTHENTICATION ENDPOINTS (NO OTP)
 # ==========================================
 @app.post("/signup")
 def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
@@ -107,49 +83,29 @@ def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        safe_password = hashlib.sha256(user.password.encode('utf-8')).hexdigest()
-        hashed_password = pwd_context.hash(safe_password)
+        # Enforce 72-byte limit safely
+        hashed_password = pwd_context.hash(user.password[:72])
         
-        otp = str(random.randint(100000, 999999))
-        
+        # Insert user and instantly mark as verified (is_verified = 1)
         db.execute(
-            "INSERT INTO users (email, password_hash, otp_code) VALUES (?, ?, ?)",
-            (user.email, hashed_password, otp)
+            "INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, 1)",
+            (user.email, hashed_password)
         )
         db.commit()
         
-        send_otp_email(user.email, otp)
-        
-        return {"message": "User created. Please check your email for the OTP."}
+        return {"message": "Account created successfully! You can now log in."}
     
     except sqlite3.OperationalError as e:
         raise HTTPException(status_code=500, detail=f"Database Crash: {str(e)}. Did you run /run-db-upgrade?")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"System Crash: {str(e)}")
 
-@app.post("/verify-otp")
-def verify_otp(data: OTPVerify, db: sqlite3.Connection = Depends(get_db)):
-    user = db.execute("SELECT * FROM users WHERE email = ?", (data.email,)).fetchone()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user["otp_code"] != data.otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    
-    db.execute("UPDATE users SET is_verified = 1, otp_code = NULL WHERE email = ?", (data.email,))
-    db.commit()
-    return {"message": "Account verified successfully. You can now log in."}
-
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
     user = db.execute("SELECT * FROM users WHERE email = ?", (form_data.username,)).fetchone()
     
-    safe_password = hashlib.sha256(form_data.password.encode('utf-8')).hexdigest()
-    
-    if not user or not pwd_context.verify(safe_password, user["password_hash"]):
+    if not user or not pwd_context.verify(form_data.password[:72], user["password_hash"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
-        
-    if not user["is_verified"]:
-        raise HTTPException(status_code=403, detail="Please verify your email via OTP first")
     
     access_token = jwt.encode(
         {"sub": user["email"], "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)},
