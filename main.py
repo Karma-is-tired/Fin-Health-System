@@ -1,305 +1,322 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request
-from fastapi.responses import FileResponse, JSONResponse
+"""Financial Health & Cash-Flow API.
+
+Settings come from environment variables (set them in your hosting dashboard):
+  SECRET_KEY       long random text used to sign login tokens (required in production)
+  ALLOWED_ORIGINS  comma-separated website addresses allowed to call this API
+  DB_PATH          where the SQLite file lives (default database/finance_tool.db)
+  CURRENCY_SYMBOL  symbol used in Word reports (default ₦)
+"""
+import io
+import logging
+import os
+import re
+import sqlite3
+import tempfile
+import time
+from collections import defaultdict, deque
+
+import pandas as pd
+from docx import Document
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from docx import Document
-import jwt
-import sqlite3
-import pandas as pd
-import io
-import tempfile
-import os
-import hashlib
-from datetime import datetime, timedelta
+from starlette.background import BackgroundTask
 
-# ==========================================
-# 0. SERVER INITIALIZATION & FOLDER SAFETY
-# ==========================================
-os.makedirs("database", exist_ok=True)
+import analytics
+from db_setup import init_db
+from security import (
+    create_token, hash_password, needs_rehash, read_token, verify_password,
+)
 
-app = FastAPI()
+logger = logging.getLogger("finhealth")
 
+DB_PATH = os.environ.get("DB_PATH", "database/finance_tool.db")
+init_db(DB_PATH)
+
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "ALLOWED_ORIGINS", "https://fin-health-system.vercel.app,http://localhost:5173"
+    ).split(",")
+    if origin.strip()
+]
+CURRENCY = os.environ.get("CURRENCY_SYMBOL", "₦")
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+app = FastAPI(title="Financial Health & Cash-Flow API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://fin-health-system.vercel.app", "http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"]
+    expose_headers=["Content-Disposition"],
 )
 
+
 @app.exception_handler(Exception)
-async def global_crash_handler(request: Request, exc: Exception):
+async def unexpected_error(request: Request, exc: Exception):
+    # The real error goes to the server log, never to the visitor.
+    logger.exception("Unhandled error on %s", request.url.path)
+    headers = {}
+    origin = request.headers.get("origin")
+    if origin in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(
         status_code=500,
-        content={"detail": f"CRITICAL BACKEND CRASH: {str(exc)}"},
-        headers={"Access-Control-Allow-Origin": "*"}
+        content={"detail": "Something went wrong on our side. Please try again."},
+        headers=headers,
     )
 
-# ==========================================
-# 1. SECURITY & AUTH SETUP
-# ==========================================
-SECRET_KEY = "your-super-secret-production-key" 
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440 
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-class UserCreate(BaseModel):
-    email: str
-    password: str
 
 def get_db():
-    conn = sqlite3.connect("database/finance_tool.db")
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
     finally:
         conn.close()
 
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+SIGN_IN_AGAIN = "Your session has expired. Please sign in again."
+
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    
-    user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    email = read_token(token)
+    if email is None:
+        raise HTTPException(401, SIGN_IN_AGAIN, headers={"WWW-Authenticate": "Bearer"})
+    user = db.execute("SELECT * FROM users WHERE lower(email) = ?", (email.lower(),)).fetchone()
     if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(401, SIGN_IN_AGAIN, headers={"WWW-Authenticate": "Bearer"})
     return user
 
-def hash_password(password: str) -> str:
-    # Bulletproof hashing that never crashes regardless of length or characters
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-# ==========================================
-# 2. AUTHENTICATION ENDPOINTS (NO OTP, NO BCRYPT)
-# ==========================================
+# ---------------------------------------------------------------------------
+# Accounts: email + password, nothing else
+# ---------------------------------------------------------------------------
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MAX_FAILED_LOGINS = 5
+LOCKOUT_SECONDS = 15 * 60
+_failed_logins = defaultdict(deque)
+_DUMMY_HASH = hash_password("not-a-real-password")  # keeps timing equal for unknown emails
+
+
+class Credentials(BaseModel):
+    email: str
+    password: str
+
+
+def _recent_failures(key):
+    now = time.time()
+    attempts = _failed_logins[key]
+    while attempts and now - attempts[0] > LOCKOUT_SECONDS:
+        attempts.popleft()
+    return attempts
+
+
+@app.get("/")
+def root():
+    return {"message": "Financial Health API is running."}
+
+
 @app.post("/signup")
-def signup(user: UserCreate, db: sqlite3.Connection = Depends(get_db)):
+def signup(body: Credentials, db: sqlite3.Connection = Depends(get_db)):
+    email = body.email.strip().lower()
+    if len(email) > 254 or not EMAIL_RE.match(email):
+        raise HTTPException(400, "Please enter a valid email address.")
+    if not 8 <= len(body.password) <= 128:
+        raise HTTPException(400, "Your password must be between 8 and 128 characters.")
+
+    taken = "That email is already registered. Try signing in instead."
+    if db.execute("SELECT 1 FROM users WHERE lower(email) = ?", (email,)).fetchone():
+        raise HTTPException(400, taken)
     try:
-        existing = db.execute("SELECT * FROM users WHERE email = ?", (user.email,)).fetchone()
-        if existing:
-            raise HTTPException(status_code=400, detail="Email already registered")
-        
-        secure_hash = hash_password(user.password)
-        
-        # Instantly mark user as verified
         db.execute(
             "INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, 1)",
-            (user.email, secure_hash)
+            (email, hash_password(body.password)),
         )
         db.commit()
-        
-        return {"message": "Account created successfully! You can now log in."}
-    
-    except sqlite3.OperationalError as e:
-        raise HTTPException(status_code=500, detail=f"Database Crash: {str(e)}. Did you run /run-db-upgrade?")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"System Crash: {str(e)}")
+    except sqlite3.IntegrityError:
+        raise HTTPException(400, taken)
+
+    # Signing up also signs you in, so you land straight on your dashboard.
+    return {"message": "Account created.", "access_token": create_token(email), "token_type": "bearer"}
+
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
-    user = db.execute("SELECT * FROM users WHERE email = ?", (form_data.username,)).fetchone()
-    
-    if not user or hash_password(form_data.password) != user["password_hash"]:
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-    
-    access_token = jwt.encode(
-        {"sub": user["email"], "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)},
-        SECRET_KEY, algorithm=ALGORITHM
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+def login(form: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
+    email = form.username.strip().lower()
+    if len(_recent_failures(email)) >= MAX_FAILED_LOGINS:
+        raise HTTPException(429, "Too many failed attempts. Please wait 15 minutes and try again.")
 
-# ==========================================
-# 3. ADAPTIVE DATA NORMALIZATION
-# ==========================================
-def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    df.columns = df.columns.str.lower().str.strip()
-    column_mapping = {
-        "date": "txn_date", "transaction date": "txn_date", "value": "amount",
-        "price": "amount", "total": "amount", "transaction type": "type",
-        "cat": "category", "desc": "description", "memo": "description",
-        "vendor": "customer_vendor", "customer": "customer_vendor"
-    }
-    df.rename(columns=column_mapping, inplace=True)
-    
-    if "txn_date" not in df.columns: df["txn_date"] = pd.Timestamp.now().strftime("%Y-%m-%d")
-    if "amount" not in df.columns: df["amount"] = 0.0
-    if "type" not in df.columns:
-        df["type"] = df["amount"].apply(lambda x: "income" if float(x) > 0 else "expense")
-    
-    df["amount"] = df["amount"].abs()
-    expected_cols = ["txn_date", "amount", "type", "category", "description", "customer_vendor", "account", "upload_id"]
-    for col in expected_cols:
-        if col not in df.columns:
-            df[col] = "Uncategorized" if col in ["category", "description", "customer_vendor", "account"] else None
-            
-    return df[expected_cols]
+    user = db.execute("SELECT * FROM users WHERE lower(email) = ?", (email,)).fetchone()
+    valid = verify_password(form.password, user["password_hash"] if user else _DUMMY_HASH)
+    if not user or not valid:
+        _recent_failures(email).append(time.time())
+        raise HTTPException(401, "Incorrect email or password.")
 
-# ==========================================
-# 4. CORE ANALYTICS ENDPOINTS
-# ==========================================
+    _failed_logins.pop(email, None)
+    if needs_rehash(user["password_hash"]):  # upgrade old accounts on their next login
+        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(form.password), user["id"]))
+        db.commit()
+    return {"access_token": create_token(user["email"]), "token_type": "bearer"}
+
+
+@app.get("/me")
+def me(user=Depends(get_current_user)):
+    return {"email": user["email"]}
+
+
+# ---------------------------------------------------------------------------
+# Analytics (every query is limited to the logged-in user's own rows)
+# ---------------------------------------------------------------------------
 @app.get("/health-score")
-def health_score(current_user: dict = Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
-    transactions = pd.read_sql_query("SELECT * FROM transactions", db)
-    invoices = pd.read_sql_query("SELECT * FROM invoices", db)
-    
-    scores = {}
-    weights = {}
+def health_score(user=Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    return analytics.compute_scores(db, user["id"])
 
-    if not transactions.empty:
-        transactions["txn_date"] = pd.to_datetime(transactions["txn_date"])
-        transactions["month"] = transactions["txn_date"].dt.to_period("M")
-        monthly = transactions.groupby(["month", "type"])["amount"].sum().unstack(fill_value=0)
-        
-        if "income" not in monthly.columns: monthly["income"] = 0
-        if "expense" not in monthly.columns: monthly["expense"] = 0
-        
-        monthly["net_profit"] = monthly["income"] - monthly["expense"]
-        monthly["margin_pct"] = (monthly["net_profit"] / monthly["income"].replace(0, pd.NA)) * 100
-        
-        avg_margin = float(monthly["margin_pct"].mean()) if pd.notna(monthly["margin_pct"].mean()) else 0.0
-        scores["profitability"] = round(max(0.0, min(100.0, 50.0 + avg_margin)), 1)
-        weights["profitability"] = 0.35
-        
-        positive_months = int((monthly["net_profit"] > 0).sum())
-        scores["cash_flow"] = round(float((positive_months / len(monthly)) * 100) if len(monthly) > 0 else 0.0, 1)
-        weights["cash_flow"] = 0.35
-    else:
-        scores["profitability"] = 0
-        scores["cash_flow"] = 0
-
-    if not invoices.empty:
-        unpaid = invoices[invoices["status"] != "paid"].copy()
-        unpaid["due_date"] = pd.to_datetime(unpaid["due_date"])
-        unpaid["days_overdue"] = (pd.Timestamp.now() - unpaid["due_date"]).dt.days.clip(lower=0)
-        total_out = float(unpaid["amount"].sum())
-        total_over = float(unpaid[unpaid["days_overdue"] > 0]["amount"].sum())
-        scores["receivables"] = round(100.0 - (total_over / total_out * 100.0) if total_out > 0 else 100.0, 1)
-        weights["receivables"] = 0.30
-
-    total_weight = sum(weights.values())
-    if total_weight == 0: return {"scores": {"No Data": 0}, "overall": 0}
-        
-    normalized_weights = {k: v / total_weight for k, v in weights.items()}
-    overall = round(sum(scores[k] * normalized_weights[k] for k in scores), 1)
-
-    return {"scores": scores, "overall": overall}
 
 @app.get("/financial-summary")
-def financial_summary(current_user: dict = Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
-    transactions = pd.read_sql_query("SELECT * FROM transactions", db)
-    if transactions.empty:
-        return {"latest_month": "N/A", "revenue": 0, "expenses": 0, "net_profit": 0, "overdue_receivables": 0}
+def financial_summary(user=Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    return analytics.financial_summary(db, user["id"])
 
-    transactions["txn_date"] = pd.to_datetime(transactions["txn_date"])
-    transactions["month"] = transactions["txn_date"].dt.to_period("M")
-    monthly = transactions.groupby(["month", "type"])["amount"].sum().unstack(fill_value=0)
-    
-    if "income" not in monthly.columns: monthly["income"] = 0
-    if "expense" not in monthly.columns: monthly["expense"] = 0
-    monthly["net_profit"] = monthly["income"] - monthly["expense"]
 
-    latest = monthly.iloc[-1]
-    
-    invoices = pd.read_sql_query("SELECT * FROM invoices", db)
-    overdue_total = float(invoices[invoices["status"] == "overdue"]["amount"].sum()) if not invoices.empty else 0.0
+@app.get("/monthly-trend")
+def monthly_trend(user=Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    return analytics.monthly_trend(db, user["id"])
 
-    return {
-        "latest_month": str(monthly.index[-1]),
-        "revenue": round(float(latest["income"]), 0),
-        "expenses": round(float(latest["expense"]), 0),
-        "net_profit": round(float(latest["net_profit"]), 0),
-        "overdue_receivables": round(overdue_total, 0),
-    }
 
-@app.post("/upload-transactions")
-async def upload_transactions(file: UploadFile = File(...), current_user: dict = Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+def _read_table(filename: str, contents: bytes) -> pd.DataFrame:
+    name = (filename or "").lower()
     try:
-        contents = await file.read()
-        if file.filename.endswith('.csv'): df = pd.read_csv(io.BytesIO(contents))
-        elif file.filename.endswith('.xlsx'): df = pd.read_excel(io.BytesIO(contents))
-        else: raise HTTPException(status_code=400, detail="Only CSV/Excel supported")
-        
-        df["upload_id"] = 3
-        df = normalize_dataframe(df)
-        df.to_sql("transactions", db, if_exists="append", index=False)
-        db.commit()
-        return {"message": f"Processed {len(df)} transactions cleanly."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        if name.endswith(".csv"):
+            try:
+                return pd.read_csv(io.BytesIO(contents), encoding="utf-8-sig")
+            except UnicodeDecodeError:
+                return pd.read_csv(io.BytesIO(contents), encoding="latin-1")
+        if name.endswith(".xlsx"):
+            return pd.read_excel(io.BytesIO(contents))
+    except Exception:
+        logger.exception("Could not read uploaded file")
+        raise HTTPException(400, "We couldn't read that file. Make sure it is a valid CSV or Excel file.")
+    raise HTTPException(400, "Please upload a .csv or .xlsx file.")
 
-# ==========================================
-# 5. HISTORY & REPORT GENERATION
-# ==========================================
-def generate_docx(month, overall, revenue, profit):
+
+@app.post("/upload/{kind}")
+def upload(
+    kind: str,
+    file: UploadFile = File(...),
+    user=Depends(get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    if kind not in analytics.NORMALIZERS:
+        raise HTTPException(404, "Unknown upload type.")
+    contents = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "That file is too large. The limit is 5 MB.")
+
+    raw = _read_table(file.filename, contents)
+    try:
+        cleaned, skipped = analytics.NORMALIZERS[kind](raw)
+    except ValueError as err:
+        raise HTTPException(400, str(err))
+
+    saved = analytics.save_upload(db, user["id"], kind, file.filename, cleaned)
+    message = f"Added {saved} {kind} row{'s' if saved != 1 else ''}."
+    if skipped:
+        message += f" Skipped {skipped} blank or unreadable row{'s' if skipped != 1 else ''}."
+    return {"message": message}
+
+
+@app.post("/load-demo-data")
+def load_demo_data(user=Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    count = analytics.load_demo_data(db, user["id"])
+    return {"message": f"Loaded {count} sample transactions, invoices and a budget."}
+
+
+# ---------------------------------------------------------------------------
+# Word reports + history
+# ---------------------------------------------------------------------------
+def _money(value):
+    return f"{CURRENCY}{float(value or 0):,.2f}"
+
+
+def _delete_quietly(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def _docx_response(month, overall, revenue, profit, filename):
     doc = Document()
-    doc.add_heading('Executive Financial Health Report', 0)
-    doc.add_heading('1. Executive Summary', level=1)
-    doc.add_paragraph(f"Analysis Period: {month}")
-    
-    status = "Strong" if overall > 75 else "Moderate" if overall > 50 else "Critical"
-    p = doc.add_paragraph(f"Overall Financial Health Score: ")
-    p.add_run(f"{overall}/100").bold = True
-    p.add_run(f" ({status})")
+    doc.add_heading("Executive Financial Health Report", 0)
+    doc.add_heading("1. Executive Summary", level=1)
+    doc.add_paragraph(f"Analysis period: {month}")
+    line = doc.add_paragraph("Overall Financial Health Score: ")
+    line.add_run(f"{overall}/100").bold = True
+    line.add_run(f" ({analytics.band(overall)})")
 
     table = doc.add_table(rows=1, cols=2)
-    table.style = 'Light Shading Accent 1'
-    hdr = table.rows[0].cells
-    hdr[0].text, hdr[1].text = 'Metric', 'Value'
-    
-    r1 = table.add_row().cells
-    r1[0].text, r1[1].text = "Revenue", f"${revenue:,.2f}"
-    r2 = table.add_row().cells
-    r2[0].text, r2[1].text = "Net Profit", f"${profit:,.2f}"
+    table.style = "Light Shading Accent 1"
+    table.rows[0].cells[0].text, table.rows[0].cells[1].text = "Metric", "Value"
+    for label, value in (("Revenue", revenue), ("Net profit", profit)):
+        cells = table.add_row().cells
+        cells[0].text, cells[1].text = label, _money(value)
 
-    doc.add_heading('2. Automated Strategic Advice', level=1)
-    if profit < (revenue * 0.1):
-        doc.add_paragraph("⚠️ PROFITABILITY: Margins are tight. Immediate action is required to cut non-essential expenses.")
+    doc.add_heading("2. Automated Strategic Advice", level=1)
+    if profit < revenue * 0.1:
+        doc.add_paragraph("PROFITABILITY: Margins are tight. Review non-essential spending soon.")
     else:
-        doc.add_paragraph("✅ PROFITABILITY: Margins are healthy. Consider reinvesting excess capital.")
+        doc.add_paragraph("PROFITABILITY: Margins are healthy. Consider reinvesting surplus cash.")
 
     fd, path = tempfile.mkstemp(suffix=".docx")
-    with os.fdopen(fd, 'wb') as f:
-        doc.save(f)
-    return path
+    with os.fdopen(fd, "wb") as handle:
+        doc.save(handle)
+    # The temporary file is removed as soon as it has been sent.
+    return FileResponse(path, filename=filename, media_type=DOCX_TYPE, background=BackgroundTask(_delete_quietly, path))
+
 
 @app.get("/download-report")
-def download_report(current_user: dict = Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
-    scores = health_score(current_user, db)
-    summary = financial_summary(current_user, db)
-    
+def download_report(user=Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    summary = analytics.financial_summary(db, user["id"])
+    if not summary["has_data"]:
+        raise HTTPException(400, "Upload some transactions before generating a report.")
+    overall = analytics.compute_scores(db, user["id"])["overall"]
+
     db.execute(
         "INSERT INTO report_history (user_id, report_month, overall_score, revenue, net_profit) VALUES (?, ?, ?, ?, ?)",
-        (current_user["id"], summary["latest_month"], scores["overall"], summary["revenue"], summary["net_profit"])
+        (user["id"], summary["latest_month"], overall, summary["revenue"], summary["net_profit"]),
     )
     db.commit()
+    return _docx_response(
+        summary["latest_month"], overall, summary["revenue"], summary["net_profit"],
+        f"FinHealth_{summary['latest_month']}.docx",
+    )
 
-    path = generate_docx(summary["latest_month"], scores["overall"], summary["revenue"], summary["net_profit"])
-    return FileResponse(path, filename=f"FinHealth_{summary['latest_month']}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 @app.get("/history")
-def get_history(current_user: dict = Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
-    rows = db.execute("SELECT id, report_month, overall_score, revenue, created_at FROM report_history WHERE user_id = ? ORDER BY created_at DESC", (current_user["id"],)).fetchall()
+def history(user=Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    rows = db.execute(
+        "SELECT id, report_month, overall_score, revenue, net_profit, created_at "
+        "FROM report_history WHERE user_id = ? ORDER BY created_at DESC, id DESC",
+        (user["id"],),
+    ).fetchall()
     return [dict(row) for row in rows]
 
-@app.get("/download-past-report/{report_id}")
-def download_past_report(report_id: int, current_user: dict = Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
-    report = db.execute("SELECT * FROM report_history WHERE id = ? AND user_id = ?", (report_id, current_user["id"])).fetchone()
-    if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
-    
-    path = generate_docx(report["report_month"], report["overall_score"], report["revenue"], report["net_profit"])
-    return FileResponse(path, filename=f"FinHealth_Archive_{report['report_month']}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-@app.get("/run-db-upgrade")
-def run_db_upgrade():
-    import upgrade_db
-    os.makedirs("database", exist_ok=True) 
-    upgrade_db.upgrade_database()
-    return {"message": "Success: Render database has been upgraded!"}
+@app.get("/download-past-report/{report_id}")
+def download_past_report(report_id: int, user=Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+    report = db.execute(
+        "SELECT * FROM report_history WHERE id = ? AND user_id = ?", (report_id, user["id"])
+    ).fetchone()
+    if not report:
+        raise HTTPException(404, "Report not found.")
+    return _docx_response(
+        report["report_month"], report["overall_score"], report["revenue"], report["net_profit"],
+        f"FinHealth_Archive_{report['report_month']}.docx",
+    )

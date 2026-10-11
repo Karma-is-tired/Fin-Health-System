@@ -1,5 +1,12 @@
 __pycache__/
 *.pyc
-frontend/node_modules/
-frontend/dist/
 .env
+.venv/
+venv/
+.pytest_cache/
+
+# Local database files hold user accounts. Never commit them.
+*.db
+*.sqlite
+*.sqlite3
+database/

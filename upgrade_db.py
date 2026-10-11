@@ -1,39 +1,12 @@
-import sqlite3
+"""Kept for convenience: runs the same safe setup the server runs on start-up.
 
-def upgrade_database():
-    conn = sqlite3.connect("database/finance_tool.db")
-    cursor = conn.cursor()
+The old version of this file dropped the users table, which would have wiped
+every account. It no longer does that.
+"""
+import os
 
-    # Create the secure users table
-    cursor.execute("DROP TABLE IF EXISTS users")
-    cursor.execute("""
-    CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        is_verified BOOLEAN DEFAULT 0,
-        otp_code TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    # Create the report history table to freeze metrics in time
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS report_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        report_month TEXT NOT NULL,
-        overall_score REAL,
-        revenue REAL,
-        net_profit REAL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-    print("Database successfully upgraded for Authentication and History.")
+from db_setup import init_db
 
 if __name__ == "__main__":
-    upgrade_database()
+    init_db(os.environ.get("DB_PATH", "database/finance_tool.db"))
+    print("Database is ready.")

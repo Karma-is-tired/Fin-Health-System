@@ -1,52 +1,96 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-
-const API_BASE = "https://fin-health-system.onrender.com"; 
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import AuthLayout, { useSlowHint } from './AuthLayout';
+import { isLoggedIn, signIn } from './api';
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const slow = useSlowHint(loading);
 
-  const handleLogin = async (e) => {
+  useEffect(() => {
+    if (isLoggedIn()) navigate('/dashboard', { replace: true });
+  }, [navigate]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    // FastAPI's OAuth2 expects form-encoded data, not JSON
-    const formData = new URLSearchParams();
-    formData.append('username', email);
-    formData.append('password', password);
-
-    const res = await fetch(`${API_BASE}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formData
-    });
-
-    const data = await res.json();
-    if (res.ok) {
-      localStorage.setItem('token', data.access_token);
+    setLoading(true);
+    try {
+      await signIn(email.trim(), password);
       navigate('/dashboard');
-    } else {
-      setError(data.detail);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-darkBg flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-cardBg rounded-xl p-8 border border-slate-700 shadow-2xl">
-        <h3 className="text-accentYellow text-sm font-bold tracking-widest uppercase mb-2">Welcome Back</h3>
-        <h1 className="text-3xl font-bold text-white mb-6">Sign in securely</h1>
-        {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-        
-        <form onSubmit={handleLogin} className="space-y-6">
-          <input type="email" placeholder="Email address" required onChange={e => setEmail(e.target.value)} className="w-full bg-[#0b1120] border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-accentYellow" />
-          <input type="password" placeholder="Password" required onChange={e => setPassword(e.target.value)} className="w-full bg-[#0b1120] border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-accentYellow" />
-          <button type="submit" className="w-full bg-accentYellow text-black font-bold py-3 rounded-lg hover:bg-yellow-400">Sign in</button>
-        </form>
-        <p className="text-slate-400 text-sm text-center mt-6">No account yet? <Link to="/signup" className="text-accentYellow">Create one</Link></p>
-      </div>
-    </div>
+    <AuthLayout
+      eyebrow="Welcome back"
+      title="Sign in securely"
+      subtitle="Use the email and password you signed up with."
+      footer={<>No account yet? <Link to="/signup" className="font-bold text-brand">Create one</Link></>}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-white">Email address</span>
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            className="field"
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-white">Password</span>
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="field pr-12"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </label>
+
+        {error && (
+          <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+            {error}
+          </p>
+        )}
+
+        <button type="submit" disabled={loading} className="btn-primary w-full">
+          <ShieldCheck size={18} />
+          {loading ? 'Signing in…' : 'Sign in'}
+        </button>
+
+        {slow && (
+          <p className="text-center text-xs text-slate-400">
+            The server may be waking up after being idle. This can take up to a minute.
+          </p>
+        )}
+      </form>
+    </AuthLayout>
   );
 }
